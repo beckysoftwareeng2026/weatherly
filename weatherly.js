@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const city = process.argv.slice(2).join(" ");
+const apiKey = process.env.OPENWEATHER_API_KEY;
 
 if (!city) {
     console.log("Please enter a city name.");
@@ -8,11 +9,22 @@ if (!city) {
     process.exit(1);
 }
 
-const apiKey = process.env.OPENWEATHER_API_KEY;
-
 if (!apiKey) {
     console.log("Missing API key. Add OPENWEATHER_API_KEY to your .env file.");
     process.exit(1);
+}
+
+function capitalize(text) {
+    return text
+        .split(" ")
+        .map((word) => word[0].toUpperCase() + word.slice(1))
+        .join(" ");
+}
+
+function formatTime(unixTime, timezoneOffset) {
+    const date = new Date((unixTime + timezoneOffset) * 1000);
+
+    return date.toUTCString().slice(17, 22);
 }
 
 async function getWeather(cityName) {
@@ -22,33 +34,41 @@ async function getWeather(cityName) {
         )}&appid=${apiKey}&units=metric`;
 
         const response = await fetch(url);
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.log(error); // Show the actual API error
-            throw new Error(`HTTP ${response.status}`);
-        }
-
         const data = await response.json();
 
+        if (!response.ok) {
+            throw new Error(data.message || "Could not fetch weather data.");
+        }
+
         const name = data.name;
+        const country = data.sys.country;
         const temp = Math.round(data.main.temp);
-        const conditions = data.weather[0].description;
+        const feelsLike = Math.round(data.main.feels_like);
+        const conditions = capitalize(data.weather[0].description);
         const humidity = data.main.humidity;
         const windKmh = Math.round(data.wind.speed * 3.6);
+        const sunrise = formatTime(data.sys.sunrise, data.timezone);
+        const sunset = formatTime(data.sys.sunset, data.timezone);
 
-        console.log(`🌦️ ${name}: ${temp}°C, ${capitalize(conditions)}`);
-        console.log(`💧 Humidity: ${humidity}% | 💨 Wind: ${windKmh} km/h`);
+        console.log(`
+====================================
+        🌦️ WEATHERLY
+====================================
+
+📍 Location: ${name}, ${country}
+🌡️ Temperature: ${temp}°C
+🤔 Feels Like: ${feelsLike}°C
+☁️ Conditions: ${conditions}
+💧 Humidity: ${humidity}%
+💨 Wind: ${windKmh} km/h
+🌅 Sunrise: ${sunrise}
+🌇 Sunset: ${sunset}
+
+Have a great day! ☀️
+`);
     } catch (error) {
-        console.log(`Error: ${error.message}`);
+        console.log(`❌ Error: ${error.message}`);
     }
-}
-
-function capitalize(text) {
-    return text
-        .split(" ")
-        .map((word) => word[0].toUpperCase() + word.slice(1))
-        .join(" ");
 }
 
 getWeather(city);
